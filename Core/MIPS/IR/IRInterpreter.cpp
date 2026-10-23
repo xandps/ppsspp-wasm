@@ -28,6 +28,15 @@
 #include "Core/System.h"
 #include "Core/MIPS/MIPSTracer.h"
 
+// On Emscripten, PPSSPP_ARCH(SSE2) is set because the build passes -msse2, but the SSE intrinsics are
+// emulated on top of wasm SIMD and some of the Vec4 paths below give wrong results (skinned models in
+// Def Jam: Fight for NY vanish in the IR interpreter, while the classic interpreter is fine).
+// Use the generic C paths instead, which the compiler vectorizes to wasm SIMD on its own.
+#ifdef __EMSCRIPTEN__
+#undef PPSSPP_ARCH_SSE2
+#define PPSSPP_ARCH_SSE2 0
+#endif
+
 #if PPSSPP_ARCH(ARM64)
 
 // TODO: This should be put in some common header.
