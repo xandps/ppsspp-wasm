@@ -68,6 +68,19 @@
 
 #define SAMPLERATE 44100
 
+#ifdef __EMSCRIPTEN__
+// Contadores para medir desempenho pelo navegador (Module._ejs_ppsspp_stat): 0 = vblanks emulados (tempo do PSP,
+// 60 por segundo em velocidade real), 1 = flips do jogo (quadros que o jogo desenhou). Só leitura, sem trava.
+// __attribute__((used)) é o EMSCRIPTEN_KEEPALIVE; o emscripten.h não entra aqui porque conflita com o FILE do libretro.
+extern "C" __attribute__((used)) double ejs_ppsspp_stat(int which) {
+   switch (which) {
+   case 0: return __DisplayGetNumVblanks();
+   case 1: return __DisplayGetFlipCount();
+   default: return 0;
+   }
+}
+#endif
+
 /* AUDIO output buffer */
 static struct {
    int16_t *data;
