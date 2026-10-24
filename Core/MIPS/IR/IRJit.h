@@ -27,6 +27,7 @@
 #include "Core/MIPS/IR/IRRegCache.h"
 #include "Core/MIPS/IR/IRFrontend.h"
 #include "Core/MIPS/MIPSVFPUUtils.h"
+#include "Core/MIPS/IR/IRWasmJit.h"
 
 #ifndef offsetof
 #include "stddef.h"
@@ -144,6 +145,9 @@ public:
 	const IRInst *GetBlockInstructionPtr(int blockNum) const {
 		return arena_.data() + blocks_[blockNum].GetIRArenaOffset();
 	}
+	size_t GetArenaSize() const {
+		return arena_.size();
+	}
 	const IRInst *GetArenaPtr() const {
 		return arena_.data();
 	}
@@ -254,6 +258,9 @@ protected:
 
 	IRFrontend frontend_;
 	IRBlockCache blocks_;
+#ifdef __EMSCRIPTEN__
+	IRWasmJit wasmJit_;
+#endif
 
 	MIPSState *mips_;
 

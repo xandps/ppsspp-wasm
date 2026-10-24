@@ -90,6 +90,9 @@ void IRJit::UpdateFCR31() {
 void IRJit::ClearCache() {
 	INFO_LOG(Log::JIT, "IRJit: Clearing the block cache!");
 	blocks_.Clear();
+#ifdef __EMSCRIPTEN__
+	wasmJit_.Reset();
+#endif
 }
 
 void IRJit::InvalidateCacheAt(u32 em_address, int length) {
@@ -181,6 +184,10 @@ void IRJit::RunLoopUntil(u64 globalticks) {
 		}
 
 		MIPSState *mips = mips_;
+#ifdef __EMSCRIPTEN__
+		wasmJit_.BeginSlice(blocks_);
+		const bool useWasm = IRWasmJit::mode != 0;
+#endif
 #ifdef _DEBUG
 		compilerEnabled_ = false;
 #endif
@@ -189,6 +196,20 @@ void IRJit::RunLoopUntil(u64 globalticks) {
 			u32 opcode = inst & 0xFF000000;
 			if (opcode == MIPS_EMUHACK_OPCODE) {
 				u32 offset = inst & 0x00FFFFFF; // Alternatively, inst - opcode
+#ifdef __EMSCRIPTEN__
+				// Compiled blocks run from their first op (the Downcount) and may chain into other compiled blocks.
+				int wasmFunc = useWasm ? wasmJit_.Lookup(offset) : 0;
+				if (wasmFunc > 0) {
+					mips->pc = wasmJit_.Run(wasmFunc, mips, blocks_.GetArenaPtr(), offset);
+					if (!Memory::IsValid4AlignedAddress(mips->pc)) {
+						int blockNum = blocks_.GetBlockNumFromIRArenaOffset(offset);
+						IRBlock *block = blocks_.GetBlockUnchecked(blockNum);
+						Core_ExecException(mips->pc, block->GetOriginalStart(), ExecExceptionType::JUMP);
+						break;
+					}
+					continue;
+				}
+#endif
 				const IRInst *instPtr = blocks_.GetArenaPtr() + offset;
 				// First op is always, except when using breakpoints, downcount, to save one dispatch inside IRInterpret.
 				// This branch is very cpu-branch-predictor-friendly so this still beats the dispatch.

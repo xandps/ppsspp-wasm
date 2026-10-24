@@ -876,6 +876,7 @@ SOURCES_CXX += \
 	       $(COREDIR)/MIPS/IR/IRInst.cpp \
 	       $(COREDIR)/MIPS/IR/IRInterpreter.cpp \
 	       $(COREDIR)/MIPS/IR/IRJit.cpp \
+	       $(COREDIR)/MIPS/IR/IRWasmJit.cpp \
 	       $(COREDIR)/MIPS/IR/IRNativeCommon.cpp \
 	       $(COREDIR)/MIPS/IR/IRPassSimplify.cpp \
 	       $(COREDIR)/MIPS/IR/IRRegCache.cpp \
