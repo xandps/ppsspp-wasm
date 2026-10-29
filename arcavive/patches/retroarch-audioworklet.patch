@@ -1,0 +1,56 @@
+diff --git a/audio/drivers/audioworklet.c b/audio/drivers/audioworklet.c
+index adcaa67c96..2b2d1c37f4 100644
+--- a/audio/drivers/audioworklet.c
++++ b/audio/drivers/audioworklet.c
+@@ -85,11 +85,14 @@ static bool audioworklet_process_cb(int numInputs, const AudioSampleFrame *input
+    if (audioworklet->driver_running)
+    {
+       /* can't use Atomics.wait in AudioWorklet  */
+-      /* busyspin is safe as of emscripten 4.0.4 */
+-      if (!emscripten_lock_busyspin_wait_acquire(&audioworklet->buffer_lock, 2.5))
++      /* Arcavive: the busyspin needs performance.now(), which AudioWorkletGlobalScope lacks before emscripten
++       * 4.0.4 (we build with 3.1.74): on contention it threw, the processor died and the main loop waited forever
++       * for the buffer to drain. Spin on the atomic only (the main thread holds the lock for a memcpy). */
+       {
+-         printf("[WARN] [AudioWorklet] Worklet: could not acquire lock\n");
+-         return true;
++         int spins = 0;
++         while (!emscripten_lock_try_acquire(&audioworklet->buffer_lock))
++            if (++spins > 100000)
++               goto output_silence;
+       }
+ 
+       avail = FIFO_READ_AVAIL(audioworklet->buffer);
+@@ -113,6 +116,7 @@ static bool audioworklet_process_cb(int numInputs, const AudioSampleFrame *input
+       }
+    }
+ 
++output_silence:
+    if (writing_frames < outputs[0].samplesPerChannel)
+    {
+       int zero_frames = outputs[0].samplesPerChannel - writing_frames;
+@@ -139,7 +143,23 @@ static void audioworklet_processor_inited_cb(EMSCRIPTEN_WEBAUDIO_T context, bool
+    }
+ 
+    worklet_node = emscripten_create_wasm_audio_worklet_node(context, "retroarch", &opts, audioworklet_process_cb, audioworklet);
+-   emscripten_audio_node_connect(worklet_node, context, 0, 0);
++   /* Arcavive: worklet -> GainNode -> destination, and the GainNode exposed in the shape of the OpenAL context
++    * (Module.AL.currentCtx.sources[i].gain), which EmulatorJS 4.2.3 uses for volume, mute, the "click to resume"
++    * popup and screen recording. Without OpenAL those controls had nothing to act on. */
++   EM_ASM({
++      var ac = emscriptenGetAudioObject($0);
++      var gain = ac.createGain();
++      emscriptenGetAudioObject($1).connect(gain);
++      gain.connect(ac.destination);
++      /* no commas outside parentheses: the preprocessor would split the EM_ASM arguments */
++      var source = {};
++      source.gain = gain;
++      var current = {};
++      current.audioCtx = ac;
++      current.sources = [source];
++      Module["AL"] = {};
++      Module["AL"].currentCtx = current;
++   }, context, worklet_node);
+ 
+    audioworklet->init_done = true;
+ }

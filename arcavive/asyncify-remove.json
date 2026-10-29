@@ -1,0 +1,7 @@
+[
+  "IRInterpret*",
+  "MIPSComp::IRJit::RunLoopUntil*",
+  "VertexDecoder::*",
+  "VtxDec_*",
+  "MIPSComp::IRWasmJit::*"
+]
